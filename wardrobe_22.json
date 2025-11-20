@@ -1,0 +1,212 @@
+{
+  "wardrobe": [
+    {
+      "id": 44,
+      "category": "top_Long sleeved shirt",
+      "size": "XXS",
+      "season": [
+        "Spring",
+        "Summer"
+      ],
+      "color": [
+        "Light blue",
+        "blue"
+      ],
+      "purpose": "formal"
+    },
+    {
+      "id": 45,
+      "category": "outerwear_Leather jacket",
+      "size": "XXS",
+      "season": [
+        "Autumn",
+        "Winter"
+      ],
+      "color": [
+        "Black"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 46,
+      "category": "outerwear_Denim jacket",
+      "size": "XXS",
+      "season": [
+        "Winter",
+        "Autumn"
+      ],
+      "color": [
+        "Black",
+        "silver"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 47,
+      "category": "top_Hoodie",
+      "size": "XXS",
+      "season": [
+        "Autumn",
+        "Winter"
+      ],
+      "color": [
+        "Beige"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 48,
+      "category": "outerwear_Puffer jacket",
+      "size": "XXS",
+      "season": [
+        "Winter",
+        "Autumn"
+      ],
+      "color": [
+        "Black"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 49,
+      "category": "bottom_Jeans",
+      "size": "XXS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Blue"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 50,
+      "category": "top_Polo shirt",
+      "size": "XXS",
+      "season": [
+        "Autumn",
+        "Spring"
+      ],
+      "color": [
+        "Navy",
+        "white"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 51,
+      "category": "bottom_Straight leg jeans",
+      "size": "XXS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Black"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 52,
+      "category": "outerwear_Jacket",
+      "size": "XXS",
+      "season": [
+        "Autumn",
+        "Winter"
+      ],
+      "color": [
+        "Green",
+        "yellow"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 53,
+      "category": "footwear_Chelsea boots",
+      "size": "XXS",
+      "season": [
+        "Autumn",
+        "Spring",
+        "Winter"
+      ],
+      "color": [
+        "Black"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 54,
+      "category": "top_Zip-up sweater",
+      "size": "XXS",
+      "season": [
+        "Winter"
+      ],
+      "color": [
+        "Off-white"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 55,
+      "category": "outerwear_Fur coat",
+      "size": "XXS",
+      "season": [
+        "Winter"
+      ],
+      "color": [
+        "Grey",
+        "black"
+      ],
+      "purpose": "formal"
+    },
+    {
+      "id": 56,
+      "category": "bottom_Cropped jeans",
+      "size": "XXS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Light gray"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 57,
+      "category": "footwear_Sneakers",
+      "size": "XXS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Black",
+        "off-white"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 58,
+      "category": "accessory_Beanie",
+      "size": "S",
+      "season": [
+        "Winter"
+      ],
+      "color": [
+        "Light Gray"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 59,
+      "category": "footwear_Crocs",
+      "size": "M",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Beige",
+        "off-white"
+      ],
+      "purpose": "casual"
+    }
+  ]
+}

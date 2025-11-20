@@ -1,0 +1,303 @@
+{
+  "wardrobe": [
+    {
+      "id": 3,
+      "category": "top_T-shirt",
+      "size": "XXS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Beige"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 4,
+      "category": "bottom_Jeans",
+      "size": "XS",
+      "season": [
+        "Winter"
+      ],
+      "color": [
+        "Blue"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 5,
+      "category": "top_Long sleeved shirt",
+      "size": "XS",
+      "season": [
+        "Winter",
+        "Autumn"
+      ],
+      "color": [
+        "Blue"
+      ],
+      "purpose": "formal"
+    },
+    {
+      "id": 6,
+      "category": "top_Polo shirt",
+      "size": "XXS",
+      "season": [
+        "Summer",
+        "Spring"
+      ],
+      "color": [
+        "Blue"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 7,
+      "category": "bottom_Suit trousers",
+      "size": "XXS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Grey"
+      ],
+      "purpose": "formal"
+    },
+    {
+      "id": 8,
+      "category": "bottom_Shorts",
+      "size": "XS",
+      "season": [
+        "Summer",
+        "Spring"
+      ],
+      "color": [
+        "Navy"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 9,
+      "category": "footwear_Loafers",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Brown"
+      ],
+      "purpose": "formal"
+    },
+    {
+      "id": 10,
+      "category": "footwear_Flip flops",
+      "size": "XXS",
+      "season": [
+        "Summer",
+        "Spring"
+      ],
+      "color": [
+        "Beige"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 11,
+      "category": "accessory_Cap",
+      "size": "XS",
+      "season": [
+        "Summer",
+        "Spring"
+      ],
+      "color": [
+        "Blue"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 12,
+      "category": "top_Tank top",
+      "size": "XS",
+      "season": [
+        "Summer"
+      ],
+      "color": [
+        "Black"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 13,
+      "category": "top_Sports top",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Black"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 14,
+      "category": "bottom_Denim shorts",
+      "size": "XS",
+      "season": [
+        "Spring",
+        "Summer"
+      ],
+      "color": [
+        "Emerald green"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 15,
+      "category": "top_Hoodie",
+      "size": "XS",
+      "season": [
+        "Winter",
+        "Autumn"
+      ],
+      "color": [
+        "Red"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 16,
+      "category": "top_Vest",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Navy"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 17,
+      "category": "bottom_Cargo pants",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Green"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 18,
+      "category": "bottom_Sports shorts",
+      "size": "XS",
+      "season": [
+        "Summer",
+        "Autumn",
+        "Spring"
+      ],
+      "color": [
+        "Turquoise"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 19,
+      "category": "outerwear_Coat",
+      "size": "XXS",
+      "season": [
+        "Winter"
+      ],
+      "color": [
+        "Beige"
+      ],
+      "purpose": "formal"
+    },
+    {
+      "id": 20,
+      "category": "outerwear_Jacket",
+      "size": "XS",
+      "season": [
+        "Winter",
+        "Autumn"
+      ],
+      "color": [
+        "Brown"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 21,
+      "category": "fullbody_Business suit",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Navy"
+      ],
+      "purpose": "formal"
+    },
+    {
+      "id": 22,
+      "category": "bag_Backpack",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Brown"
+      ],
+      "purpose": "casual"
+    },
+    {
+      "id": 23,
+      "category": "accessory_Fedora",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Mustard"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 24,
+      "category": "footwear_Sneakers",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "White"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 25,
+      "category": "footwear_Boots",
+      "size": "XS",
+      "season": [
+        "All year round"
+      ],
+      "color": [
+        "Beige"
+      ],
+      "purpose": "all_purpose"
+    },
+    {
+      "id": 26,
+      "category": "top_Turtleneck",
+      "size": "XS",
+      "season": [
+        "Autumn",
+        "Winter"
+      ],
+      "color": [
+        "Bordeaux"
+      ],
+      "purpose": "all_purpose"
+    }
+  ]
+}
