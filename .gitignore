@@ -205,3 +205,39 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# Python/FastAPI
+myenv/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.pid
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+*.sqlite3
+*.db
+.env
+
+# Generated embeddings/vector indexes
+test_gu_em_la_ai/*.npy
+test_gu_em_la_ai/*.index
+
+# CRA frontend
+frontend/node_modules/
+frontend/build/
+frontend/.cache/
+frontend/.env.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
