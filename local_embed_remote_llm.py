@@ -30,7 +30,8 @@ TOP_K_EMBED = 25
 TOP_K_RERANK = 7   
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
 WORKING_DIR = "./test_gu_em_la_ai"
-API_URL = "https://localhost:7016/item-descriptions/{userId}/raw"  
+WARDROBE_API_BASE = os.getenv("WARDROBE_API_BASE", "https://localhost:7016")
+API_URL = f"{WARDROBE_API_BASE}/item-descriptions/{{userId}}/raw"
 
 if not os.path.exists(WORKING_DIR):
     os.mkdir(WORKING_DIR)
@@ -317,7 +318,7 @@ def load_wardrobe_for_user(user_id: str):
     Dynamically fetch wardrobe JSON for the given user_id from the C# API.
     Falls back to local cache if unavailable.
     """
-    url = f"https://localhost:7016/item-descriptions/{user_id}/raw"
+    url = API_URL.format(userId=user_id)
     print(f"📡 Fetching wardrobe data for user {user_id} from {url} ...")
 
     try:
