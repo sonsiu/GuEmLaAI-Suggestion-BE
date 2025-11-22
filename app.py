@@ -9,7 +9,10 @@ app = FastAPI(title="Wardrobe Stylist API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://nocatch.duckdns.org",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
