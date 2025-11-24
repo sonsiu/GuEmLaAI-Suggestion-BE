@@ -511,7 +511,7 @@ def parse_outfits_from_llm(suggestion: str) -> list:
 
 
 def validate_and_fill_outfits(outfits: list, wardrobe_items: list, candidates_by_cat: dict) -> list:
-    """Ensure each outfit has at least top, bottom, footwear. Prefer 5-item outfits by adding outerwear and accessory when possible.
+    """Ensure each outfit has at least top, bottom, footwear. Prefer 4-item outfits by adding outerwear or accessory when possible.
     outfits: list of lists of ids (ints)
     candidates_by_cat: dict with keys 'top','bottom','footwear','outerwear','accessory' -> list of candidate dicts with 'id'
     Returns a list of validated/fixed outfits (each a list of ints)."""
@@ -552,10 +552,8 @@ def validate_and_fill_outfits(outfits: list, wardrobe_items: list, candidates_by
                         present[req] = cid
                         break
 
-        # Prefer to reach 5 items by adding outerwear then accessory
+        # Prefer to reach 4 items by adding one optional piece (outerwear first, then accessory)
         for opt in ["outerwear", "accessory"]:
-            if len(uniq) >= 5:
-                break
             # Only attempt to add optional category if candidates exist for it
             if present[opt] is None and candidates_by_cat.get(opt):
                 for cand in candidates_by_cat.get(opt, []):
@@ -570,8 +568,13 @@ def validate_and_fill_outfits(outfits: list, wardrobe_items: list, candidates_by
 
         # Final check: must have required categories
         if present["top"] and present["bottom"] and present["footwear"]:
-            # Enforce no duplicate categories (should be ensured by mapping logic)
-            fixed.append(uniq[:5])
+            final_outfit = []
+            # Build final outfit in category priority, capped at 4 items
+            for cat in ["top", "bottom", "footwear", "outerwear", "accessory"]:
+                iid = present.get(cat)
+                if iid is not None and len(final_outfit) < 4:
+                    final_outfit.append(iid)
+            fixed.append(final_outfit)
         else:
             # could not satisfy minimal requirements
             fixed.append([])
