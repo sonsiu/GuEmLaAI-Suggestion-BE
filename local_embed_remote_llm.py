@@ -234,10 +234,10 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
         f"Below are the wardrobe categories and the most relevant items for each category:\n"
         f"{context_block}\n\n"
         f'User asked: "{user_query}"\n\n'
-        "Choose 2 distinct outfits. Each outfit must be returned as a single array of integer item IDs (for example: [3, 7, 12, 15, 6]). Follow these rules exactly:\n"
+        "Choose 2 distinct outfits. Each outfit must be returned as a single array of integer item IDs (for example: [3, 7, 12, 15]). Follow these rules exactly:\n"
         "- Each outfit MUST include at minimum: 1 bottom (pants or skirt), 1 top (shirt, blouse, etc.), and 1 footwear (shoes, sandals, boots).\n"
-        "- Prefer a full 5-item outfit when possible: top + bottom + footwear + outerwear (jacket/coat) + accessory or bag. If both outerwear and accessory are available and appropriate, include both to make a 5-item outfit.\n"
-        "- If a full 5-item outfit is not possible (missing relevant items), return the minimal valid outfit (at least top, bottom, footwear).\n"
+        "- Prefer a full 4-item outfit when possible: top + bottom + footwear + outerwear (jacket/coat) OR accessory OR bag. The 4th item only choose one of outerwear OR accessory OR bag.\n"
+        "- If a full 4-item outfit is not possible (missing relevant items), return the minimal valid outfit (at least top, bottom, footwear).\n"
         "- Do NOT include duplicate categories in the same outfit (for example: do not include two bottoms or two footwear items in one outfit).\n"
         "- Choose items from the provided lists with highest relevance for the user's request. If an exact category is missing, choose the closest matching item.\n"
         "- The two outfits must be meaningfully different (different style, formality, or variant) while both satisfying the user's request.\n"
@@ -246,7 +246,7 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
         "[array_of_ids_for_outfit_1]\n"
         "[array_of_ids_for_outfit_2]\n\n"
         "Example:\n"
-        "[3, 7, 12, 15, 6]\n"
+        "[3, 7, 12, 15]\n"
         "[2, 6, 9, 14]"
     )
     
@@ -298,13 +298,13 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
             if o and len(selected_outfits) < 2:
                 selected_outfits.append(o)
 
-    # Final normalization: ensure list of ints and trim to 5 items each
+    # Final normalization: ensure list of ints and trim to 4 items each
     final_selected = []
     for o in selected_outfits[:2]:
         if not o:
             final_selected.append([])
         else:
-            final_selected.append([int(x) for x in o][:5])
+            final_selected.append([int(x) for x in o][:4])
 
     # For backward compatibility, also provide the raw bracket strings if available
     cut_suggestion = re.split(r"\[[^\]]*\]", suggestion)[0].strip()
@@ -515,6 +515,17 @@ def validate_and_fill_outfits(outfits: list, wardrobe_items: list, candidates_by
     outfits: list of lists of ids (ints)
     candidates_by_cat: dict with keys 'top','bottom','footwear','outerwear','accessory' -> list of candidate dicts with 'id'
     Returns a list of validated/fixed outfits (each a list of ints)."""
+    # Precompute score lookups to break ties when multiple items share a category
+    score_lookup = {}
+    for cat, cand_list in candidates_by_cat.items():
+        for cand in cand_list or []:
+            try:
+                cid = int(cand.get("id"))
+                score = float(cand.get("score", 0))
+            except Exception:
+                continue
+            score_lookup.setdefault(cat, {})[cid] = score
+
     fixed = []
     for outfit in outfits:
         # remove duplicates while preserving order
@@ -530,53 +541,61 @@ def validate_and_fill_outfits(outfits: list, wardrobe_items: list, candidates_by
             seen.add(iid)
             uniq.append(iid)
 
-        # map present categories
+        # map present categories, keeping the best (highest score) when duplicates appear
         present = {"top": None, "bottom": None, "footwear": None, "outerwear": None, "accessory": None}
         for iid in uniq:
             item = _get_item_by_id(wardrobe_items, iid)
             cat = _get_category_tag(item) if item else None
-            if cat and present.get(cat) is None:
+            if not cat:
+                continue
+            current = present.get(cat)
+            if current is None:
                 present[cat] = iid
+            else:
+                # Replace if this item has a better similarity score
+                current_score = score_lookup.get(cat, {}).get(current, float("-inf"))
+                new_score = score_lookup.get(cat, {}).get(iid, float("-inf"))
+                if new_score > current_score:
+                    present[cat] = iid
 
         # Fill missing required categories in order: bottom, top, footwear
         for req in ["bottom", "top", "footwear"]:
-            # Only attempt to fill if we have candidate items for that category
-            if present[req] is None and candidates_by_cat.get(req):
+            if present[req] is None:
                 for cand in candidates_by_cat.get(req, []):
                     try:
                         cid = int(cand.get("id"))
                     except Exception:
                         continue
-                    if cid not in uniq and _get_item_by_id(wardrobe_items, cid):
-                        uniq.append(cid)
+                    if cid in present.values():
+                        continue
+                    if _get_item_by_id(wardrobe_items, cid):
                         present[req] = cid
                         break
 
-        # Prefer to reach 4 items by adding one optional piece (outerwear first, then accessory)
+        # Prefer to reach 4 items by adding outerwear then accessory, no duplicate categories
         for opt in ["outerwear", "accessory"]:
-            # Only attempt to add optional category if candidates exist for it
-            if present[opt] is None and candidates_by_cat.get(opt):
+            if len([v for v in present.values() if v]) >= 4:
+                break
+            if present[opt] is None:
                 for cand in candidates_by_cat.get(opt, []):
                     try:
                         cid = int(cand.get("id"))
                     except Exception:
                         continue
-                    if cid not in uniq and _get_item_by_id(wardrobe_items, cid):
-                        uniq.append(cid)
+                    if cid in present.values():
+                        continue
+                    if _get_item_by_id(wardrobe_items, cid):
                         present[opt] = cid
                         break
 
-        # Final check: must have required categories
+        # Final check: must have required categories, and enforce single item per category
         if present["top"] and present["bottom"] and present["footwear"]:
-            final_outfit = []
-            # Build final outfit in category priority, capped at 4 items
+            ordered = []
             for cat in ["top", "bottom", "footwear", "outerwear", "accessory"]:
-                iid = present.get(cat)
-                if iid is not None and len(final_outfit) < 4:
-                    final_outfit.append(iid)
-            fixed.append(final_outfit)
+                if present.get(cat):
+                    ordered.append(present[cat])
+            fixed.append(ordered[:4])
         else:
-            # could not satisfy minimal requirements
             fixed.append([])
 
     return fixed
@@ -626,6 +645,9 @@ def build_deterministic_outfits(wardrobe_items: list, candidates_by_cat: dict) -
                         used.add(cid)
                         present_cats.add(req)
                         break
+            # stop if we already reached 4 items
+            if len(outfit) >= 4:
+                return outfit
         return outfit
 
     outfit_a = ensure_minimal(outfit_a, used)
