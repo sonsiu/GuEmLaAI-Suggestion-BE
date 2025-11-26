@@ -15,6 +15,26 @@ import re
 import ast
 import time;
 
+from category_synonyms import category_synonyms
+
+WHITELIST_TOKENS = [
+    "outfit", "clothes", "clothing", "wardrobe",
+    "shirt", "tshirt", "tee", "polo", "hoodie", "sweater", "jacket", "coat",
+    "pants", "trousers", "jeans", "shorts", "skirt", "dress", "suit",
+    "shoes", "sneakers", "boots", "loafers", "sandals", "heels", "footwear",
+    # Vietnamese tokens
+    "mặc", "áo", "quần", "váy", "giày",
+    "trang phục", "phong cách", "đi tiệc", "phỏng vấn", "đi chơi"
+]
+
+BLACKLIST_TOKENS = [
+    "http://", "https://", "www.", ".com", ".net", ".org",
+    "select ", "insert ", "update ", "delete ", "drop ", "union ",
+    "sql ", "ssh ", "ftp ", "sudo", "rm -", "pip ", "npm ", "curl ",
+    "password", "bank", "loan", "crypto", "bitcoin", "eth", "server",
+    "politics", "election", "president", "prime minister"
+]
+
 load_dotenv()
 
 # -----------------------
@@ -85,6 +105,16 @@ def build_faiss_index(wardrobe_items, working_dir=WORKING_DIR):
         except Exception:
             rebuild = True
 
+        # ===========================rebuild only for debug reasons, remove after done debugging================================
+        # wardrobe_texts = normalize_wardrobe_items(wardrobe_items)
+        # wardrobe_embeddings = embedding_func(wardrobe_texts)
+        # dim = wardrobe_embeddings.shape[1]
+        # index = faiss.IndexFlatIP(dim)
+        # index.add(wardrobe_embeddings)
+        # faiss.write_index(index, index_file)
+        # np.save(embeddings_file, wardrobe_embeddings)
+        # ==========================================================================================    
+        
     if not rebuild:
         # os.path.exists(index_file) and os.path.exists(embeddings_file):
         print(f"\n✅ Loading existing FAISS index from {WORKING_DIR}")
@@ -133,35 +163,54 @@ def llm_func_system_user(system_prompt: str, user_prompt: str, model="gpt-4o-min
     else:
         raise RuntimeError("No LLM API key found. Set OPENROUTER_API_KEY in environment or .env")
 
+def analyze_intent_and_relevance(user_query: str) -> t.Tuple[bool, str]:
+    """
+    Guardrail + normalization via LLM.
+    Returns (relevant, normalized_intent).
+    """
+    system_prompt = (
+        "You are a guardrail and intent normalizer for a wardrobe stylist app. "
+        "Decide if the query is about clothing/outfits/personal styling. "
+        "If relevant, rewrite into one short English sentence covering occasion, formality, season/weather, and style tone. "
+        "Respond ONLY with JSON: {\"relevant\": true/false, \"intent\": \"...\"}. "
+        "If not relevant, intent should be an empty string."
+    )
+    user_prompt = (
+        f'User query: "{user_query}"\n'
+        "Return JSON exactly. Examples:\n"
+        '{"relevant": true, "intent": "A smart casual outfit for a summer office day with breathable fabrics."}\n'
+        '{"relevant": false, "intent": ""}'
+    )
+    try:
+        raw = llm_func_system_user(system_prompt, user_prompt, max_tokens=120, temperature=0.2)
+        raw_clean = raw.strip().strip("`").strip()
+        parsed = json.loads(raw_clean)
+        relevant = bool(parsed.get("relevant"))
+        intent = parsed.get("intent", "") if relevant else ""
+        return relevant, intent.strip()
+    except Exception as e:
+        print(f"Guardrail intent LLM failed to parse: {e}")
+        # Fallback: treat as relevant and reuse the raw query to avoid blocking the flow
+        return True, user_query.strip()
+
 # -----------------------
 # Main Workflow
 # -----------------------
 def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
 
-    if isPromptLongEnough(user_query, 20) == False:
-        return {"selected_ids": [], "suggestion": "Please provide a more detailed request — for example, mention the occasion, season, or style you want."}
+    ok_length, length_msg = isPromptLengthValid(user_query, 20, 300)
+    if not ok_length:
+        return {"selected_ids": [], "suggestion": length_msg}
 
-    if isPromptRelevant(user_query, wardrobe_items, index) == False:
+    if not passes_keyword_filters(user_query):
         return {"selected_ids": [], "suggestion": "I don't have an answer for this question. Please ask questions about outfit suggestion."}
 
-    # STEP 1: Remote LLM to analyze user query into normalized intent
-    system_prompt = (
-    "You are a helpful Vietnamese fashion assistant. "
-    "Your task is to analyze the user's clothing request and convert it into a normalized, descriptive fashion intent. "
-    "Focus on identifying the occasion, formality level, season, and overall style tone. "
-    "Output a single, natural English sentence that clearly describes what the user wants to wear — no explanation, no list, just one concise sentence suitable for embedding search."
-)
-    user_prompt = (
-    f'User asked: "{user_query}"\n\n'
-    "Rewrite their fashion intent into a single natural English sentence that clearly states:\n"
-    "- The occasion or context (e.g., wedding, job interview, casual outing)\n"
-    "- The level of formality (formal or casual)\n"
-    "- The season or weather if implied (e.g., summer, winter)\n"
-    "- The overall style tone (e.g., elegant, minimalist, cozy, streetwear)\n\n"
-    "Return only one sentence, for example:\n"
-    "\"An elegant formal outfit suitable for a summer wedding.\""
-)
-    analyzed_intent = llm_func_system_user(system_prompt, user_prompt, max_tokens=100, temperature=0.5)
+    # STEP 1: LLM guardrail + normalization of intent
+    relevant, analyzed_intent = analyze_intent_and_relevance(user_query)
+    if not relevant:
+        return {"selected_ids": [], "suggestion": "I don't have an answer for this question. Please ask questions about outfit suggestion."}
+    if not analyzed_intent:
+        analyzed_intent = user_query
     print(f"📝 User query: {user_query}\n")
     print(f"[STEP 1] Analyze intent for better embedding...")
     print(analyzed_intent)
@@ -371,16 +420,76 @@ def isPromptRelevant(user_query: str, wardrobe_items: list, index) -> bool:
     # If the top score is lower than threshold (e.g., 0.5), it's likely irrelevant
     threshold = 0.45
     return top_score >= threshold
-def isPromptLongEnough(user_query: str, minLength: int) -> bool:
-    return len(user_query.strip()) >= minLength
+def isPromptLengthValid(user_query: str, minLength: int, maxLength: int = 500) -> t.Tuple[bool, str]:
+    """
+    Enforce minimum detail and cap overly long prompts to avoid injection/noise.
+    Returns (ok, message_if_not_ok).
+    """
+    text = user_query.strip()
+    if len(text) < minLength:
+        return False, "Please provide a more detailed request—for example, mention the occasion, season, or style you want."
+    if len(text) > maxLength:
+        return False, f"Your request is too long. Please shorten it to under {maxLength} characters so I can help accurately."
+    return True, ""
+
+def passes_keyword_filters(text: str) -> bool:
+    """Deterministic guard: block obvious off-topic; allow if any fashion token appears."""
+    t = text.lower()
+    if any(b in t for b in BLACKLIST_TOKENS):
+        return False
+    if any(w in t for w in WHITELIST_TOKENS):
+        return True
+    return False
+
 def normalize_wardrobe_items(wardrobe_items):
+    """
+    Build richer, bilingual descriptions for better semantic recall.
+    Includes purpose, desc, season/weather hints, and category synonyms.
+    """
     normalized = []
     for item in wardrobe_items:
-        if isinstance(item, dict):
-            text = f"id: {item.get('id', '') }, {item.get('category', '')}, size {item.get('size', '')}, {', '.join(item.get('color', []))}, {', '.join(item.get('season', []))}"
-            normalized.append(text.strip())
-        else:
+        if not isinstance(item, dict):
             normalized.append(str(item))
+            continue
+
+        cat = item.get("category", "")
+        syns = category_synonyms(cat)
+        size = item.get("size", "")
+        colors = ", ".join(item.get("color", []))
+        seasons = ", ".join(item.get("season", []))
+        purpose = item.get("purpose", "")
+        desc = item.get("desc", "")
+
+        purpose_tags = []
+        if purpose == "formal":
+            purpose_tags = ["formal", "smart", "business", "office", "trang trong"]
+        elif purpose == "casual":
+            purpose_tags = ["casual", "everyday", "relaxed", "thoai mai"]
+        elif purpose == "all_purpose":
+            purpose_tags = ["versatile", "multi-occasion", "linh hoat"]
+
+        season_tags = []
+        lower_seasons = seasons.lower()
+        if "summer" in lower_seasons or "spring" in lower_seasons:
+            season_tags += ["warm weather", "hot", "mua he", "mua xuan"]
+        if "winter" in lower_seasons or "autumn" in lower_seasons:
+            season_tags += ["cool weather", "cold", "mua dong", "mua thu"]
+        if "all year" in lower_seasons:
+            season_tags += ["all seasons", "quanh nam"]
+
+        text = (
+            f"id: {item.get('id', '')}; "
+            f"{syns}; "
+            f"size {size}; "
+            f"colors: {colors}; "
+            f"season: {seasons}; "
+            f"purpose: {purpose} {' '.join(purpose_tags)}; "
+            f"desc: {desc}"
+        )
+        if season_tags:
+            text += f"; weather tags: {' '.join(season_tags)}"
+
+        normalized.append(text.strip())
     return normalized
 
 def filter_wardrobe_by_score(candidates: list):
@@ -664,7 +773,9 @@ if __name__ == "__main__":
     try:
         # Example queries
         queries = [
-            "tôi nên mặc gì đi đám cưới?",
+            "helo",
+            # "thịt chó có ngon như người ta bảo không",
+            # "ngày mai tôi đi bảo vệ đồ án, tôi nên mặc gì?",
             # "Tôi nên mặc gì đến buổi phỏng vấn quan trọng của tôi?",
             # "Tôi nên mặc gì đi uống cà phê với bạn?",
             # "Tôi nên mặc gì đến buổi BBQ ngoài trời của bạn tôi?",

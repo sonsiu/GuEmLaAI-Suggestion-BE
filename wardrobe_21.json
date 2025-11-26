@@ -10,7 +10,8 @@
       "color": [
         "Beige"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Basic beige T-shirt suitable for everyday wear."
     },
     {
       "id": 4,
@@ -22,7 +23,8 @@
       "color": [
         "Blue"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Blue jeans offering a relaxed casual style."
     },
     {
       "id": 5,
@@ -35,7 +37,8 @@
       "color": [
         "Blue"
       ],
-      "purpose": "formal"
+      "purpose": "formal",
+      "desc": "Long-sleeved blue shirt suited for formal settings."
     },
     {
       "id": 6,
@@ -48,7 +51,8 @@
       "color": [
         "Blue"
       ],
-      "purpose": "all_purpose"
+      "purpose": "all_purpose",
+      "desc": "Blue polo shirt versatile for casual and semi-formal use."
     },
     {
       "id": 7,
@@ -60,7 +64,8 @@
       "color": [
         "Grey"
       ],
-      "purpose": "formal"
+      "purpose": "formal",
+      "desc": "Grey suit trousers appropriate for professional occasions."
     },
     {
       "id": 8,
@@ -73,7 +78,8 @@
       "color": [
         "Navy"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Navy shorts ideal for warm-weather casual wear."
     },
     {
       "id": 9,
@@ -85,7 +91,8 @@
       "color": [
         "Brown"
       ],
-      "purpose": "formal"
+      "purpose": "formal",
+      "desc": "Brown loafers complementing smart and formal outfits."
     },
     {
       "id": 10,
@@ -98,7 +105,8 @@
       "color": [
         "Beige"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Light beige flip flops for relaxed warm-season use."
     },
     {
       "id": 11,
@@ -111,7 +119,8 @@
       "color": [
         "Blue"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Blue cap suitable for outdoor casual styling."
     },
     {
       "id": 12,
@@ -123,7 +132,8 @@
       "color": [
         "Black"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Black tank top, lightweight and breathable for hot days."
     },
     {
       "id": 13,
@@ -135,7 +145,8 @@
       "color": [
         "Black"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Black sports top designed for workouts or daily comfort."
     },
     {
       "id": 14,
@@ -148,7 +159,8 @@
       "color": [
         "Emerald green"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Emerald green denim shorts adding a bold seasonal look."
     },
     {
       "id": 15,
@@ -161,7 +173,8 @@
       "color": [
         "Red"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Red hoodie providing warmth and everyday comfort."
     },
     {
       "id": 16,
@@ -173,7 +186,8 @@
       "color": [
         "Navy"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Navy vest suitable for layering in multiple seasons."
     },
     {
       "id": 17,
@@ -185,7 +199,8 @@
       "color": [
         "Green"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Green cargo pants offering utility and casual comfort."
     },
     {
       "id": 18,
@@ -199,7 +214,8 @@
       "color": [
         "Turquoise"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Turquoise sports shorts for active and breathable wear."
     },
     {
       "id": 19,
@@ -211,7 +227,8 @@
       "color": [
         "Beige"
       ],
-      "purpose": "formal"
+      "purpose": "formal",
+      "desc": "Beige winter coat designed for warmth and elegance."
     },
     {
       "id": 20,
@@ -224,7 +241,8 @@
       "color": [
         "Brown"
       ],
-      "purpose": "all_purpose"
+      "purpose": "all_purpose",
+      "desc": "Brown jacket adaptable for both casual and neat outfits."
     },
     {
       "id": 21,
@@ -236,7 +254,8 @@
       "color": [
         "Navy"
       ],
-      "purpose": "formal"
+      "purpose": "formal",
+      "desc": "Navy business suit presenting a polished professional look."
     },
     {
       "id": 22,
@@ -248,7 +267,8 @@
       "color": [
         "Brown"
       ],
-      "purpose": "casual"
+      "purpose": "casual",
+      "desc": "Brown backpack suitable for daily carry and travel."
     },
     {
       "id": 23,
@@ -260,7 +280,8 @@
       "color": [
         "Mustard"
       ],
-      "purpose": "all_purpose"
+      "purpose": "all_purpose",
+      "desc": "Mustard fedora adding a stylish accent to various outfits."
     },
     {
       "id": 24,
@@ -272,7 +293,8 @@
       "color": [
         "White"
       ],
-      "purpose": "all_purpose"
+      "purpose": "all_purpose",
+      "desc": "White sneakers versatile for both casual and smart-casual looks."
     },
     {
       "id": 25,
@@ -284,7 +306,8 @@
       "color": [
         "Beige"
       ],
-      "purpose": "all_purpose"
+      "purpose": "all_purpose",
+      "desc": "Beige boots that pair well with multiple seasonal outfits."
     },
     {
       "id": 26,
@@ -297,7 +320,8 @@
       "color": [
         "Bordeaux"
       ],
-      "purpose": "all_purpose"
+      "purpose": "all_purpose",
+      "desc": "Bordeaux turtleneck sweater suited for cool-weather layering."
     }
   ]
 }
