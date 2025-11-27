@@ -232,13 +232,13 @@ def analyze_intent_and_relevance(user_query: str) -> t.Tuple[bool, dict]:
         "- rewrite_en: one short English sentence capturing occasion, formality, season/weather, and style tone.\n"
         "- rewrite_vi: the same, but in Vietnamese.\n"
         "- keywords: only key terms (comma separated), no filler words.\n"
-        "- attributes: JSON with formality (formal/casual/smart casual/any), season (array like [\"summer\"], empty if unknown), occasion (short string).\n"
+        "- attributes: JSON with formality (formal/casual/any), season (array like [\"summer\"], empty if unknown), occasion (short string).\n"
         "Respond ONLY with JSON. If not relevant, set relevant=false and keep other fields minimal/empty."
     )
     user_prompt = (
         f'User query: "{user_query}"\n'
         "Return JSON exactly. Example:\n"
-        '{\"relevant\": true, \"rewrite_en\": \"Smart casual summer outfit for an office day, breathable fabrics.\", \"rewrite_vi\": \"Trang phuc smart casual cho ngay he di lam, vai thoang mat.\", \"keywords\": \"summer, office, smart casual, breathable\", \"attributes\": {\"formality\": \"smart casual\", \"season\": [\"summer\"], \"occasion\": \"office\"}}\n'
+        '{\"relevant\": true, \"rewrite_en\": \"Casual summer outfit for an office day, breathable fabrics.\", \"rewrite_vi\": \"Trang phuc casual cho ngay he di lam, vai thoang mat.\", \"keywords\": \"summer, office, casual, breathable\", \"attributes\": {\"formality\": \"casual\", \"season\": [\"summer\"], \"occasion\": \"office\"}}\n'
         '{\"relevant\": false, \"rewrite_en\": \"\", \"rewrite_vi\": \"\", \"keywords\": \"\", \"attributes\": {\"formality\": \"any\", \"season\": [], \"occasion\": \"\"}}'
     )
     try:
@@ -592,6 +592,10 @@ def filter_wardrobe_by_attributes(attributes: dict, candidates: list):
     """
     Uses parsed attributes (formality/season/occasion) instead of plain string matching.
     Applies a soft filter for season and a hard filter for conflicting formality.
+    Rules:
+      - If user wants casual => drop items tagged formal
+      - If user wants formal => drop items tagged casual
+      - Otherwise keep all purposes
     """
     attrs = attributes or {}
     formality = str(attrs.get("formality", "")).lower()
@@ -604,7 +608,7 @@ def filter_wardrobe_by_attributes(attributes: dict, candidates: list):
         purpose = str(item.get("purpose", "")).lower()
         score = float(c.get("score", 0))
 
-        # Hard filter on formality conflicts
+        # Hard filter on formality conflicts per wardrobe purpose tag
         if formality.startswith("formal") and purpose == "casual":
             continue
         if formality.startswith("casual") and purpose == "formal":
