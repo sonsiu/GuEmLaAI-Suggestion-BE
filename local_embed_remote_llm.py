@@ -48,6 +48,7 @@ os.environ["HF_HUB_OFFLINE"] = "1"
 DEVICE = "cuda" if USE_CUDA else "cpu"
 TOP_K_EMBED = 25   
 TOP_K_RERANK = 7   
+QUERY_SCORE_AGGREGATION = "max"  # "max" or "mean" when merging multi-view query scores
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
 WORKING_DIR = "./test_gu_em_la_ai"
 WARDROBE_API_BASE = os.getenv("WARDROBE_API_BASE", "https://localhost:7016")
@@ -84,6 +85,58 @@ def embedding_func(texts: t.Union[str, t.List[str]]) -> np.ndarray:
     arr = arr / norms
     return arr
 
+def aggregate_multi_query_candidates(
+    query_texts: t.List[str],
+    index,
+    wardrobe_items: list,
+    top_k: int = TOP_K_EMBED,
+    mode: str = QUERY_SCORE_AGGREGATION,
+) -> list:
+    """
+    Embed multiple query variants and merge their FAISS scores.
+    mode: "max" keeps the best score per item across queries; "mean" averages them.
+    """
+    if not query_texts:
+        return []
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for qt in query_texts:
+        key = qt.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            deduped.append(qt)
+
+    if not deduped:
+        return []
+
+    q_embs = embedding_func(deduped).astype("float32")
+    combined: dict[int, dict] = {}
+
+    for q_emb in q_embs:
+        D, I = index.search(q_emb.reshape(1, -1), k=top_k)
+        for score, idx in zip(D[0], I[0]):
+            if idx < 0 or idx >= len(wardrobe_items):
+                continue
+            item = wardrobe_items[idx]
+            entry = combined.setdefault(
+                idx, {"id": item.get("id"), "scores": [], "text": item}
+            )
+            entry["scores"].append(float(score))
+
+    results = []
+    for entry in combined.values():
+        scores = entry["scores"] or [0.0]
+        if mode == "mean":
+            agg_score = float(sum(scores) / len(scores))
+        else:
+            agg_score = float(max(scores))
+        results.append({"id": entry["id"], "score": agg_score, "text": entry["text"]})
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
+
 # -----------------------
 # Build FAISS Index
 # -----------------------
@@ -106,13 +159,13 @@ def build_faiss_index(wardrobe_items, working_dir=WORKING_DIR):
             rebuild = True
 
         # ===========================rebuild only for debug reasons, remove after done debugging================================
-        # wardrobe_texts = normalize_wardrobe_items(wardrobe_items)
-        # wardrobe_embeddings = embedding_func(wardrobe_texts)
-        # dim = wardrobe_embeddings.shape[1]
-        # index = faiss.IndexFlatIP(dim)
-        # index.add(wardrobe_embeddings)
-        # faiss.write_index(index, index_file)
-        # np.save(embeddings_file, wardrobe_embeddings)
+        wardrobe_texts = normalize_wardrobe_items(wardrobe_items)
+        wardrobe_embeddings = embedding_func(wardrobe_texts)
+        dim = wardrobe_embeddings.shape[1]
+        index = faiss.IndexFlatIP(dim)
+        index.add(wardrobe_embeddings)
+        faiss.write_index(index, index_file)
+        np.save(embeddings_file, wardrobe_embeddings)
         # ==========================================================================================    
         
     if not rebuild:
@@ -163,35 +216,55 @@ def llm_func_system_user(system_prompt: str, user_prompt: str, model="gpt-4o-min
     else:
         raise RuntimeError("No LLM API key found. Set OPENROUTER_API_KEY in environment or .env")
 
-def analyze_intent_and_relevance(user_query: str) -> t.Tuple[bool, str]:
+def analyze_intent_and_relevance(user_query: str) -> t.Tuple[bool, dict]:
     """
-    Guardrail + normalization via LLM.
-    Returns (relevant, normalized_intent).
+    Guardrail + richer intent parsing.
+    Returns (relevant, intent_payload) where payload contains:
+      - rewrite_en: English rewrite of the intent
+      - rewrite_vi: Vietnamese rewrite of the intent
+      - keywords: compressed keyword-only intent
+      - attributes: dict with formality/season/occasion (best-effort)
     """
     system_prompt = (
         "You are a guardrail and intent normalizer for a wardrobe stylist app. "
         "Decide if the query is about clothing/outfits/personal styling. "
-        "If relevant, rewrite into one short English sentence covering occasion, formality, season/weather, and style tone. "
-        "Respond ONLY with JSON: {\"relevant\": true/false, \"intent\": \"...\"}. "
-        "If not relevant, intent should be an empty string."
+        "If relevant, produce:\n"
+        "- rewrite_en: one short English sentence capturing occasion, formality, season/weather, and style tone.\n"
+        "- rewrite_vi: the same, but in Vietnamese.\n"
+        "- keywords: only key terms (comma separated), no filler words.\n"
+        "- attributes: JSON with formality (formal/casual/smart casual/any), season (array like [\"summer\"], empty if unknown), occasion (short string).\n"
+        "Respond ONLY with JSON. If not relevant, set relevant=false and keep other fields minimal/empty."
     )
     user_prompt = (
         f'User query: "{user_query}"\n'
-        "Return JSON exactly. Examples:\n"
-        '{"relevant": true, "intent": "A smart casual outfit for a summer office day with breathable fabrics."}\n'
-        '{"relevant": false, "intent": ""}'
+        "Return JSON exactly. Example:\n"
+        '{\"relevant\": true, \"rewrite_en\": \"Smart casual summer outfit for an office day, breathable fabrics.\", \"rewrite_vi\": \"Trang phuc smart casual cho ngay he di lam, vai thoang mat.\", \"keywords\": \"summer, office, smart casual, breathable\", \"attributes\": {\"formality\": \"smart casual\", \"season\": [\"summer\"], \"occasion\": \"office\"}}\n'
+        '{\"relevant\": false, \"rewrite_en\": \"\", \"rewrite_vi\": \"\", \"keywords\": \"\", \"attributes\": {\"formality\": \"any\", \"season\": [], \"occasion\": \"\"}}'
     )
     try:
-        raw = llm_func_system_user(system_prompt, user_prompt, max_tokens=120, temperature=0.2)
+        raw = llm_func_system_user(system_prompt, user_prompt, max_tokens=220, temperature=0.2)
         raw_clean = raw.strip().strip("`").strip()
         parsed = json.loads(raw_clean)
         relevant = bool(parsed.get("relevant"))
-        intent = parsed.get("intent", "") if relevant else ""
-        return relevant, intent.strip()
+        if not relevant:
+            return False, {}
+
+        payload = {
+            "rewrite_en": (parsed.get("rewrite_en") or "").strip(),
+            "rewrite_vi": (parsed.get("rewrite_vi") or "").strip(),
+            "keywords": (parsed.get("keywords") or "").strip(),
+            "attributes": parsed.get("attributes") or {},
+        }
+        return True, payload
     except Exception as e:
         print(f"Guardrail intent LLM failed to parse: {e}")
         # Fallback: treat as relevant and reuse the raw query to avoid blocking the flow
-        return True, user_query.strip()
+        return True, {
+            "rewrite_en": user_query.strip(),
+            "rewrite_vi": "",
+            "keywords": "",
+            "attributes": {"formality": "any", "season": [], "occasion": ""},
+        }
 
 # -----------------------
 # Main Workflow
@@ -206,48 +279,36 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
         return {"selected_ids": [], "suggestion": "I don't have an answer for this question. Please ask questions about outfit suggestion."}
 
     # STEP 1: LLM guardrail + normalization of intent
-    relevant, analyzed_intent = analyze_intent_and_relevance(user_query)
+    relevant, intent_payload = analyze_intent_and_relevance(user_query)
     if not relevant:
         return {"selected_ids": [], "suggestion": "I don't have an answer for this question. Please ask questions about outfit suggestion."}
-    if not analyzed_intent:
-        analyzed_intent = user_query
-    print(f"📝 User query: {user_query}\n")
+    intent_payload = intent_payload or {}
+
+    print(f"dY\"? User query: {user_query}\n")
     print(f"[STEP 1] Analyze intent for better embedding...")
-    print(analyzed_intent)
+    print(intent_payload)
     print("\n")
     
-    # STEP 2: 
-    print(f"[STEP 2] Local embedding of query...\n")
-    q_emb = embedding_func(analyzed_intent).astype("float32")
-    
-    # STEP 3: Local FAISS Search
-    print(f"[STEP 3] Local FAISS search...")
-    D, I = index.search(q_emb, k=TOP_K_EMBED)
-    sim_scores = D[0].tolist()
-    indices = I[0].tolist()
-    
-    candidates = [
-        {"id": item["id"], "score": float(score), "text": item}
-        for idx, score in zip(indices, sim_scores)
-        if (item := wardrobe_items[idx])  
+    # STEP 2: Multi-view embedding of queries (raw + EN rewrite + VI rewrite + keywords)
+    print(f"[STEP 2] Local embedding of query variants...\n")
+    query_variants = [
+        user_query,
+        intent_payload.get("rewrite_en", ""),
+        intent_payload.get("rewrite_vi", ""),
+        intent_payload.get("keywords", ""),
     ]
+    candidates = aggregate_multi_query_candidates(
+        query_variants, index, wardrobe_items, top_k=TOP_K_EMBED, mode=QUERY_SCORE_AGGREGATION
+    )
 
-    
+    print(f"[STEP 3] Local FAISS search merged across {len([q for q in query_variants if q.strip()])} query views...")
 
-    # print(f" Top {len(candidates)} candidates from FAISS:")
-    # for candidate in candidates:
-    #     print(candidate)
-
-    # =============filter wardrobe by formality============================================================
-    candidates = filter_wardrobe_by_formality(analyzed_intent, candidates)
+    # =============filter wardrobe by parsed attributes====================================================
+    candidates = filter_wardrobe_by_attributes(intent_payload.get("attributes"), candidates)
 
     # =============filter wardrobe by score================================================================
     candidates = filter_wardrobe_by_score(candidates)
     
-    # print(f"After filter:")
-    # for candidate in candidates:
-    #     print(candidate)
-
     for i, c in enumerate(candidates[:TOP_K_EMBED], 1):
         print(f" {i:2d}. (score={c['score']:.4f}) {c['text']}")
     
@@ -262,9 +323,6 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
 
     # STEP 4: Build context for LLM
     print(f"\n[STEP 4] Preparing LLM prompt...")
-    # context_lines = [f"{c['idx']}. {c['text']} (score={c['score']:.4f})" for c in candidates]
-    # context_lines = [f"{c['text']} (score={c['score']:.4f})" for c in candidates]
-    # context_block = "\n".join(context_lines)
 
     context_sections = [    
         format_candidates("Tops", top_candidates),
@@ -275,8 +333,6 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
         format_candidates("Footwear", footwear_candidates),
     ]
     context_block = "\n".join(context_sections)
-
-    # print(context_block)
 
     system_prompt = "You are a friendly personal stylist. Use the provided wardrobe items to recommend suitable outfits."
     user_prompt = (
@@ -305,7 +361,7 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
     print(user_prompt)
 
     print("\n" + "="*80)
-    print("✨ LLM Outfit Suggestion ✨")
+    print("?o\" LLM Outfit Suggestion ?o\"")
     print("="*80)
     print(suggestion)
     print("="*80)
@@ -325,7 +381,7 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
 
     # If parsed result is missing or invalid, use deterministic fallback
     if not parsed or not any(validated):
-        print("⚠️ LLM output invalid or incomplete — using deterministic fallback to build outfits.")
+        print("?s??,? LLM output invalid or incomplete ?? using deterministic fallback to build outfits.")
         fallback = build_deterministic_outfits(wardrobe_items, candidates_by_cat)
         selected_outfits = [o for o in fallback if o]
     else:
@@ -359,9 +415,7 @@ def suggest_outfit_from_wardrobe(user_query: str, wardrobe_items: list, index):
     cut_suggestion = re.split(r"\[[^\]]*\]", suggestion)[0].strip()
     return {"selected_ids": final_selected, "suggestion": cut_suggestion}
 
-# -----------------------
-# Helper Function
-# -----------------------
+
 def load_wardrobe_for_user(user_id: str):
     """
     Dynamically fetch wardrobe JSON for the given user_id from the C# API.
@@ -533,6 +587,48 @@ def filter_wardrobe_by_formality(user_query: str, candidates: list):
 
     # No explicit 'formal' or 'casual' in query: return the original candidates list
     return candidates
+
+def filter_wardrobe_by_attributes(attributes: dict, candidates: list):
+    """
+    Uses parsed attributes (formality/season/occasion) instead of plain string matching.
+    Applies a soft filter for season and a hard filter for conflicting formality.
+    """
+    attrs = attributes or {}
+    formality = str(attrs.get("formality", "")).lower()
+    season_pref = [s.lower() for s in (attrs.get("season") or []) if isinstance(s, str)]
+    occasion = str(attrs.get("occasion", "")).lower()
+
+    filtered = []
+    for c in candidates or []:
+        item = c.get("text", {}) if isinstance(c, dict) else {}
+        purpose = str(item.get("purpose", "")).lower()
+        score = float(c.get("score", 0))
+
+        # Hard filter on formality conflicts
+        if formality.startswith("formal") and purpose == "casual":
+            continue
+        if formality.startswith("casual") and purpose == "formal":
+            continue
+
+        # Soft preference on season
+        item_seasons = [s.lower() for s in (item.get("season") or []) if isinstance(s, str)]
+        bonus = 0.0
+        if season_pref:
+            if item_seasons and any(s in item_seasons for s in season_pref):
+                bonus += 0.05
+            elif item_seasons:
+                bonus -= 0.05
+
+        # Simple occasion nudge (keep minimal to avoid over-filtering)
+        if occasion:
+            desc = (item.get("desc") or "").lower()
+            if occasion in desc:
+                bonus += 0.02
+
+        filtered.append({**c, "score": score + bonus})
+
+    # Avoid empty results if filters were too strict
+    return filtered if filtered else candidates
 
 def filter_wardrobe_by_category(category_prefix: str, candidates: list):
     """
@@ -773,9 +869,9 @@ if __name__ == "__main__":
     try:
         # Example queries
         queries = [
-            "helo",
+            # "helo",
             # "thịt chó có ngon như người ta bảo không",
-            # "ngày mai tôi đi bảo vệ đồ án, tôi nên mặc gì?",
+            "ngày mai tôi đi bảo vệ đồ án, tôi nên mặc gì?",
             # "Tôi nên mặc gì đến buổi phỏng vấn quan trọng của tôi?",
             # "Tôi nên mặc gì đi uống cà phê với bạn?",
             # "Tôi nên mặc gì đến buổi BBQ ngoài trời của bạn tôi?",
