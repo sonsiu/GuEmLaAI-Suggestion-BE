@@ -1,6 +1,6 @@
 # app.py
 from fastapi import FastAPI, Depends, Cookie
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import local_embed_remote_llm as stylist  
 from fastapi.middleware.cors import CORSMiddleware
 from auth import authorize_user
@@ -20,6 +20,8 @@ app.add_middleware(
 
 class QueryRequest(BaseModel):
     query: str
+    wardrobe: list | None = Field(default=None, description="Optional wardrobe payload sent from client cache")
+    wardrobe_version: str | None = Field(default=None, description="Client-side wardrobe version for logging")
 
 @app.post("/suggest-outfit")
 async def suggest_outfit(req: QueryRequest, user=Depends(authorize_user)):
@@ -33,9 +35,10 @@ async def suggest_outfit(req: QueryRequest, user=Depends(authorize_user)):
         print("✅ Models loaded successfully.")
 
     user_id = user["user_id"]
-    # step 1: load wardrobe from api
-    wardrobe_items = stylist.load_wardrobe_for_user(user_id)
 
+    # Prefer client-provided wardrobe to avoid re-downloading from API
+    wardrobe_items = req.wardrobe if req.wardrobe else stylist.load_wardrobe_for_user(user_id)
+    print("wardrobe_items:", wardrobe_items)
     # step 2: filter wardrobe
 
     # step 3: build faiss index from filtered wardrobe

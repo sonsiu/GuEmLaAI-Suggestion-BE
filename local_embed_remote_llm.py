@@ -1,4 +1,4 @@
-# lightrag_wardrobe_stylist_v3.py
+﻿# lightrag_wardrobe_stylist_v3.py
 """
 Wardrobe Stylist - Pure Local Embedding + Reranking, Remote LLM Only for Final Suggestion
 """
@@ -18,13 +18,20 @@ import time;
 from category_synonyms import category_synonyms
 
 WHITELIST_TOKENS = [
-    "outfit", "clothes", "clothing", "wardrobe",
-    "shirt", "tshirt", "tee", "polo", "hoodie", "sweater", "jacket", "coat",
-    "pants", "trousers", "jeans", "shorts", "skirt", "dress", "suit",
+    "outfit", "clothes", "clothing", "wardrobe", "attire", "wear", "wearing",
+    "style", "fashion", "look", "fit",
+    "shirt", "tshirt", "tee", "polo", "hoodie", "sweater", "cardigan", "jacket", "coat", "blazer", "vest",
+    "pants", "trousers", "jeans", "shorts", "skirt", "dress", "suit", "tie", "bow tie",
     "shoes", "sneakers", "boots", "loafers", "sandals", "heels", "footwear",
+    "bag", "belt",
+    "formal", "casual", "business", "smart casual", "business casual",
+    "wedding", "ceremony", "party", "interview", "presentation", "meeting", "office", "work",
     # Vietnamese tokens
-    "mặc", "áo", "quần", "váy", "giày",
-    "trang phục", "phong cách", "đi tiệc", "phỏng vấn", "đi chơi"
+    "mặc", "áo", "quần", "váy", "giày", "dép", "áo sơ mi", "quần tây", "áo khoác", "áo vest", "suit",
+    "trang phục", "phong cách", "đi tiệc", "phỏng vấn", "đi chơi", "đi làm", "đi làm việc", "đi họp", "phòng họp",
+    "bảo vệ đồ án", "bảo vệ luận văn", "thuyết trình", "thuyết trình khách hàng",
+    "tiệc cưới", "dự cưới", "đám cưới", "đồ cưới", "dạ tiệc",
+    "dã ngoại", "đi biển", "đi du lịch"
 ]
 
 BLACKLIST_TOKENS = [
@@ -216,6 +223,36 @@ def llm_func_system_user(system_prompt: str, user_prompt: str, model="gpt-4o-min
     else:
         raise RuntimeError("No LLM API key found. Set OPENROUTER_API_KEY in environment or .env")
 
+def infer_formality(user_query: str, parsed_attributes: dict) -> str:
+    """
+    Lightweight, deterministic formality classifier to reduce prompt load on the LLM.
+    Uses existing attribute hints first, then falls back to keyword cues.
+    """
+    if not isinstance(parsed_attributes, dict):
+        parsed_attributes = {}
+
+    existing = str(parsed_attributes.get("formality", "")).lower().strip()
+    if existing in {"formal", "casual"}:
+        return existing
+
+    q = user_query.lower()
+    formal_signals = [
+        "bảo vệ", "luận văn", "đồ án", "thesis", "defense", "presentation",
+        "interview", "phỏng vấn", "meeting", "hội nghị", "conference",
+        "client", "ceremony", "đám cưới", "graduation", "kỷ yếu", "pitch"
+    ]
+    casual_signals = [
+        "đi chơi", "hang out", "picnic", "du lịch", "travel", "barbecue",
+        "bbq", "cafe", "cà phê", "thoải mái", "casual", "dã ngoại"
+    ]
+
+    if any(token in q for token in formal_signals):
+        return "formal"
+    if any(token in q for token in casual_signals):
+        return "casual"
+    return "any"
+
+
 def analyze_intent_and_relevance(user_query: str) -> t.Tuple[bool, dict]:
     """
     Guardrail + richer intent parsing.
@@ -229,17 +266,17 @@ def analyze_intent_and_relevance(user_query: str) -> t.Tuple[bool, dict]:
         "You are a guardrail and intent normalizer for a wardrobe stylist app. "
         "Decide if the query is about clothing/outfits/personal styling. "
         "If relevant, produce:\n"
-        "- rewrite_en: one short English sentence capturing occasion, formality, season/weather, and style tone.\n"
+        "- rewrite_en: one short English sentence capturing occasion, season/weather, and style tone.\n"
         "- rewrite_vi: the same, but in Vietnamese.\n"
         "- keywords: only key terms (comma separated), no filler words.\n"
-        "- attributes: JSON with formality (formal/casual/any), season (array like [\"summer\"], empty if unknown), occasion (short string).\n"
+        "- attributes: JSON with season (array like [\"summer\"], empty if unknown) and occasion (short string). Leave formality empty; it will be inferred separately.\n"
         "Respond ONLY with JSON. If not relevant, set relevant=false and keep other fields minimal/empty."
     )
     user_prompt = (
         f'User query: "{user_query}"\n'
         "Return JSON exactly. Example:\n"
-        '{\"relevant\": true, \"rewrite_en\": \"Casual summer outfit for an office day, breathable fabrics.\", \"rewrite_vi\": \"Trang phuc casual cho ngay he di lam, vai thoang mat.\", \"keywords\": \"summer, office, casual, breathable\", \"attributes\": {\"formality\": \"casual\", \"season\": [\"summer\"], \"occasion\": \"office\"}}\n'
-        '{\"relevant\": false, \"rewrite_en\": \"\", \"rewrite_vi\": \"\", \"keywords\": \"\", \"attributes\": {\"formality\": \"any\", \"season\": [], \"occasion\": \"\"}}'
+        '{\"relevant\": true, \"rewrite_en\": \"Smart summer outfit for an office day, breathable fabrics.\", \"rewrite_vi\": \"Trang phuc gọn gàng cho ngày hè đi làm, vải thoáng mát.\", \"keywords\": \"summer, office, smart, breathable\", \"attributes\": {\"formality\": \"\", \"season\": [\"summer\"], \"occasion\": \"office\"}}\n'
+        '{\"relevant\": false, \"rewrite_en\": \"\", \"rewrite_vi\": \"\", \"keywords\": \"\", \"attributes\": {\"formality\": \"\", \"season\": [], \"occasion\": \"\"}}'
     )
     try:
         raw = llm_func_system_user(system_prompt, user_prompt, max_tokens=220, temperature=0.2)
@@ -255,6 +292,9 @@ def analyze_intent_and_relevance(user_query: str) -> t.Tuple[bool, dict]:
             "keywords": (parsed.get("keywords") or "").strip(),
             "attributes": parsed.get("attributes") or {},
         }
+        attrs = payload["attributes"] or {}
+        attrs["formality"] = infer_formality(user_query, attrs)
+        payload["attributes"] = attrs
         return True, payload
     except Exception as e:
         print(f"Guardrail intent LLM failed to parse: {e}")
@@ -263,7 +303,7 @@ def analyze_intent_and_relevance(user_query: str) -> t.Tuple[bool, dict]:
             "rewrite_en": user_query.strip(),
             "rewrite_vi": "",
             "keywords": "",
-            "attributes": {"formality": "any", "season": [], "occasion": ""},
+            "attributes": {"formality": infer_formality(user_query, {}), "season": [], "occasion": ""},
         }
 
 # -----------------------
