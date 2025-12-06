@@ -12,6 +12,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://nocatch.duckdns.org",
+        "https://guemlaai.site",
     ],
     allow_credentials=True,
     allow_methods=["*"],
