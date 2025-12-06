@@ -33,7 +33,8 @@ def authorize_user(token: str = Depends(oauth2_scheme)):
         if not user_id:
             raise HTTPException(status_code=401, detail="Token missing subject")
 
-        return {"user_id": user_id, "email": email, "role": role}
+        # Include raw token so downstream endpoints can forward it when proxying
+        return {"user_id": user_id, "email": email, "role": role, "token": token}
 
     except JWTError as e:
         raise HTTPException(
