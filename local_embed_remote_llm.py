@@ -57,12 +57,13 @@ TOP_K_EMBED = 25
 TOP_K_RERANK = 7   
 QUERY_SCORE_AGGREGATION = "max"  # "max" or "mean" when merging multi-view query scores
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
-WORKING_DIR = "./test_gu_em_la_ai"
+WORKING_DIR = "wardrobe_data"
 WARDROBE_API_BASE = os.getenv("WARDROBE_API_BASE", "https://localhost:7016")
 API_URL = f"{WARDROBE_API_BASE}/item-descriptions/{{userId}}/raw"
 
-if not os.path.exists(WORKING_DIR):
-    os.mkdir(WORKING_DIR)
+# Ensure cache directory exists
+if WORKING_DIR and not os.path.exists(WORKING_DIR):
+    os.makedirs(WORKING_DIR, exist_ok=True)
 
 # -----------------------
 # Load models LOCALLY
@@ -145,18 +146,35 @@ def aggregate_multi_query_candidates(
     return results
 
 # -----------------------
-# Build FAISS Index
+# Build FAISS Index (cached per user/version)
 # -----------------------
-def build_faiss_index(wardrobe_items, working_dir=WORKING_DIR):
-    index_file = os.path.join(WORKING_DIR, "wardrobe_faiss.index")
-    embeddings_file = os.path.join(WORKING_DIR, "wardrobe_embeddings.npy")
+def _ensure_dir(path: str):
+    """Create directory if it doesn't exist."""
+    if path and not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
 
-    # with open("wardrobe.json", "r", encoding="utf-8") as f:
-    #         data = json.load(f)
-    # wardrobe_items = data["wardrobe"]
 
-    # Check if indexes changed
+def build_faiss_index(
+    wardrobe_items,
+    user_id: t.Union[str, int, None] = None,
+    wardrobe_version: str | None = None,
+    working_dir: str = WORKING_DIR,
+):
+    # Build per-user/version cache file names
+    prefix_parts = []
+    if user_id is not None:
+        prefix_parts.append(str(user_id))
+    if wardrobe_version:
+        prefix_parts.append(str(wardrobe_version))
+    prefix = "_".join(prefix_parts) if prefix_parts else "wardrobe"
+
+    index_file = os.path.join(working_dir, f"{prefix}_faiss.index")
+    embeddings_file = os.path.join(working_dir, f"{prefix}_embeddings.npy")
+
+    _ensure_dir(working_dir)
+
     rebuild = True
+    existing_embeddings = None
     if os.path.exists(index_file) and os.path.exists(embeddings_file):
         try:
             existing_embeddings = np.load(embeddings_file)
@@ -165,37 +183,24 @@ def build_faiss_index(wardrobe_items, working_dir=WORKING_DIR):
         except Exception:
             rebuild = True
 
-        # ===========================rebuild only for debug reasons, remove after done debugging================================
-        wardrobe_texts = normalize_wardrobe_items(wardrobe_items)
-        wardrobe_embeddings = embedding_func(wardrobe_texts)
-        dim = wardrobe_embeddings.shape[1]
-        index = faiss.IndexFlatIP(dim)
-        index.add(wardrobe_embeddings)
-        faiss.write_index(index, index_file)
-        np.save(embeddings_file, wardrobe_embeddings)
-        # ==========================================================================================    
-        
     if not rebuild:
-        # os.path.exists(index_file) and os.path.exists(embeddings_file):
-        print(f"\n✅ Loading existing FAISS index from {WORKING_DIR}")
+        print(f"\nLoading existing FAISS index from {index_file}")
         index = faiss.read_index(index_file)
         wardrobe_embeddings = existing_embeddings
         print(f"   Loaded {index.ntotal} wardrobe items (dim={wardrobe_embeddings.shape[1]})")
     else:
-        print(f"\n📦 Building FAISS index")
+        print(f"\nBuilding FAISS index for prefix '{prefix}'")
 
-        # Embed human-readable normalized texts (not raw dicts) to get meaningful semantic vectors
         wardrobe_texts = normalize_wardrobe_items(wardrobe_items)
         wardrobe_embeddings = embedding_func(wardrobe_texts)
         dim = wardrobe_embeddings.shape[1]
         index = faiss.IndexFlatIP(dim)
         index.add(wardrobe_embeddings)
 
-        # Save for future use
         faiss.write_index(index, index_file)
         np.save(embeddings_file, wardrobe_embeddings)
-        print(f"   ✅ Indexed {index.ntotal} wardrobe items (dim={dim})")
-        print(f"   💾 Saved to {WORKING_DIR}")
+        print(f"   Indexed {index.ntotal} wardrobe items (dim={dim})")
+        print(f"   Saved to {index_file} and {embeddings_file}")
 
     return index, wardrobe_embeddings
 # -----------------------
@@ -927,7 +932,7 @@ if __name__ == "__main__":
         for query in queries:
             # wardrobe_items = filter_wardrobe_by_formality(query, wardrobe_items)
             # print("NORMALIZED WARDROBE ITEMS TEXTS:", wardrobe_items_texts)
-            index, _ = build_faiss_index(wardrobe_items)
+            index, _ = build_faiss_index(wardrobe_items, user_id="21")
             result = suggest_outfit_from_wardrobe(query, wardrobe_items, index)
             print("\n")
         

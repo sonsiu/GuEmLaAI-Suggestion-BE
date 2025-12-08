@@ -48,8 +48,12 @@ async def suggest_outfit(req: QueryRequest, user=Depends(authorize_user)):
     print("wardrobe_items:", wardrobe_items)
     # step 2: filter wardrobe
 
-    # step 3: build faiss index from filtered wardrobe
-    index, _ = stylist.build_faiss_index(wardrobe_items)
+    # step 3: build faiss index from filtered wardrobe (cached per user/version)
+    index, _ = stylist.build_faiss_index(
+        wardrobe_items,
+        user_id=user_id,
+        wardrobe_version=req.wardrobe_version,
+    )
     
     # step 4: suggest outfit from filtered wardrobe
     result = stylist.suggest_outfit_from_wardrobe(req.query, wardrobe_items, index)
