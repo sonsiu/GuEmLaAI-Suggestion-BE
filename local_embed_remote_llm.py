@@ -42,7 +42,8 @@ BLACKLIST_TOKENS = [
     "politics", "election", "president", "prime minister"
 ]
 
-load_dotenv()
+# Load .env values, overriding any existing env vars so edits take effect without cleaning the shell
+load_dotenv(override=True)
 
 # -----------------------
 # Config
@@ -57,6 +58,7 @@ TOP_K_EMBED = 25
 TOP_K_RERANK = 7   
 QUERY_SCORE_AGGREGATION = "max"  # "max" or "mean" when merging multi-view query scores
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+print ("OPENROUTER_KEY:", OPENROUTER_KEY)
 WORKING_DIR = "wardrobe_data"
 WARDROBE_API_BASE = os.getenv("WARDROBE_API_BASE", "https://localhost:7016")
 API_URL = f"{WARDROBE_API_BASE}/item-descriptions/{{userId}}/raw"
@@ -154,6 +156,14 @@ def _ensure_dir(path: str):
         os.makedirs(path, exist_ok=True)
 
 
+def _sanitize_prefix(prefix: str) -> str:
+    """Make a filesystem-safe prefix (Windows-safe: no colons, slashes, etc.)."""
+    sanitized = re.sub(r"[^0-9A-Za-z._-]", "-", prefix)
+    # Collapse repeated hyphens and strip leading/trailing separators
+    sanitized = re.sub(r"-{2,}", "-", sanitized).strip("-")
+    return sanitized or "wardrobe"
+
+
 def build_faiss_index(
     wardrobe_items,
     user_id: t.Union[str, int, None] = None,
@@ -168,8 +178,12 @@ def build_faiss_index(
         prefix_parts.append(str(wardrobe_version))
     prefix = "_".join(prefix_parts) if prefix_parts else "wardrobe"
 
-    index_file = os.path.join(working_dir, f"{prefix}_faiss.index")
-    embeddings_file = os.path.join(working_dir, f"{prefix}_embeddings.npy")
+    safe_prefix = _sanitize_prefix(prefix)
+    if safe_prefix != prefix:
+        print(f"Sanitized prefix '{prefix}' -> '{safe_prefix}' for filesystem safety")
+
+    index_file = os.path.join(working_dir, f"{safe_prefix}_faiss.index")
+    embeddings_file = os.path.join(working_dir, f"{safe_prefix}_embeddings.npy")
 
     _ensure_dir(working_dir)
 
@@ -214,6 +228,9 @@ def llm_call_openrouter(messages: list, model="gpt-4o-mini", max_tokens=400, tem
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": temperature}
     r = requests.post(url, headers=headers, json=payload, timeout=60)
+    if not r.ok:
+        # Log raw response to help debug provider errors (e.g., 402 Payment Required)
+        print(f"OpenRouter response status={r.status_code}, body={r.text}")
     r.raise_for_status()
     data = r.json()
     return data["choices"][0]["message"]["content"]
@@ -940,5 +957,3 @@ if __name__ == "__main__":
         print(f"\n❌ Error: {e}")
         import traceback
         traceback.print_exc()
-
-
