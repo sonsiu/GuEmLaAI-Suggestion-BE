@@ -1,7 +1,7 @@
 # app.py
 from fastapi import FastAPI, Depends, Cookie, HTTPException
 from pydantic import BaseModel, Field
-import local_embed_remote_llm as stylist  
+import stylist
 from fastapi.middleware.cors import CORSMiddleware
 from auth import authorize_user
 import os
